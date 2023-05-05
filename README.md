@@ -26,6 +26,10 @@ or
 go run chatgpt.go
 ```
 
+## Pull Requests
+
+Pull Requests is welcome but the main purpose of this demo is to keep it simple and easy to understand, and strictly limited in "350 lines of code".
+
 ## Todo
 
 This Readme is not complete, come back and check updates if you need more details. A Chinese version will also be available soon.
