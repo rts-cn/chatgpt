@@ -60,7 +60,7 @@ func main() {
 	// traceNATS = true
 	err := ctrl.Init(new(TTSHandler), traceNATS, natsURL)
 	if err != nil {
-		log.Panic("init ctrl err:", err)
+		log.Panic("ctrl init err:", err)
 	}
 
 	my_natsSubject := "cn.xswitch.ctrl." + ctrl.UUID()
