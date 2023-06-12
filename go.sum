@@ -1,5 +1,5 @@
-git.xswitch.cn/xswitch/xctrl v0.0.11 h1:fjREAQbIsLMA/+BQme5lq/nCqT4zOvEHL48NSqZUmZo=
-git.xswitch.cn/xswitch/xctrl v0.0.11/go.mod h1:tWRnhvFbdZ7/0IAzcW69uqWi+bkodvQmvZKnuQY+Myg=
+git.xswitch.cn/xswitch/xctrl v1.1.0 h1:zwfvSrCZVQop0bDrE9ZW/5dHqX8yI+tbfS1BlZuYI2I=
+git.xswitch.cn/xswitch/xctrl v1.1.0/go.mod h1:tWRnhvFbdZ7/0IAzcW69uqWi+bkodvQmvZKnuQY+Myg=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
