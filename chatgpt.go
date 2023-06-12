@@ -17,13 +17,16 @@ import (
 	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 
-	"git.xswitch.cn/xswitch/xctrl/core/ctrl"
-	"git.xswitch.cn/xswitch/xctrl/core/proto/xctrl"
+	"git.xswitch.cn/xswitch/xctrl/ctrl"
+	"git.xswitch.cn/xswitch/xctrl/ctrl/nats"
+	"git.xswitch.cn/xswitch/xctrl/proto/xctrl"
 	openai "github.com/sashabaranov/go-openai"
 )
 
+const ASR_ENGINE = "ali"
 const TTS_ENGINE = "ali"
 const TTS_VOICE = "aixia"
+const traceNATS = false
 
 var gptToken = ""
 var natsURL = ""
@@ -56,14 +59,12 @@ func init() {
 
 func main() {
 	shutdown := make(chan os.Signal, 1)
-	traceNATS := false
-	// traceNATS = true
-	err := ctrl.Init(new(TTSHandler), traceNATS, natsURL)
+	err := ctrl.Init(traceNATS, natsURL)
 	if err != nil {
 		log.Panic("ctrl init err:", err)
 	}
 
-	my_natsSubject := "cn.xswitch.ctrl." + ctrl.UUID()
+	myNatsSubject := "cn.xswitch.ctrl"
 
 	w := log.WithFields(log.Fields{}).Writer()
 	defer w.Close()
@@ -72,9 +73,7 @@ func main() {
 		"natsSubject": natsSubject,
 	}).Info("subscribe to:")
 	color.New(color.FgGreen).Fprintln(w, "小樱桃XSwitch ChatGPT Demo Started")
-	ctrl.EnableApp(my_natsSubject)
-	ctrl.EnableEvent(my_natsSubject, "")
-	ctrl.EnableEvent(natsSubject, "q")
+	ctrl.EnableApp(new(GPTHandler), myNatsSubject, "q")
 
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGILL, syscall.SIGTSTP)
 
@@ -83,77 +82,56 @@ func main() {
 	os.Exit(0)
 }
 
-type TTSHandler struct {
+type GPTHandler struct {
 }
 type CChannel struct {
 	*ctrl.Channel
 	prompts []openai.ChatCompletionMessage
 }
 
-func (h *TTSHandler) Request(ctx context.Context, topic string, reply string, request *ctrl.Request) {
-}
-
-func (h *TTSHandler) App(ctx context.Context, topic string, reply string, message *ctrl.Message) {
-	if message.Method == "Event.Channel" {
-		event := new(ctrl.Channel)
+func (h *GPTHandler) ChannelEvent(ctx context.Context, c *ctrl.Channel) {
+	channel := &CChannel{
+		Channel: c,
+		prompts: []openai.ChatCompletionMessage{},
+	}
+	log.WithFields(log.Fields{
+		"state": channel.State,
+		"uuid":  channel.Uuid,
+	}).Info("Event.Channel:")
+	switch channel.State {
+	case "START":
+		go h.handle(channel)
+	case "DESTROY":
 		log.WithFields(log.Fields{
-			"method": message.Method,
-			"state":  event.State,
-		}).Info("Event:")
-	} else if message.Method == "Event.DetectedData" {
-		event := new(xctrl.DetectedData)
-		json.Unmarshal(*message.Params, event)
-		log.WithFields(log.Fields{
-			"type":     event.Type,
-			"is_final": event.IsFinal,
-			"text":     event.Text,
-		}).Info("DetectedData:")
-	} else {
-		log.WithFields(log.Fields{
-			"method": message.Method,
-		}).Info("Event:")
+			"uuid":     channel.Uuid,
+			"duration": channel.Duration,
+			"billsec":  channel.Billsec,
+			"cause":    channel.Cause,
+		}).Info("Channel Hangup")
 	}
 }
 
-func (h *TTSHandler) Event(ctx context.Context, topic string, message *ctrl.Request) {
+func (h *GPTHandler) Event(message *ctrl.Message, natsEvent nats.Event) {
 	switch message.Method {
-	case "Event.Channel":
+	case "Event.DetectedData":
 		{
-			channel := &CChannel{
-				Channel: new(ctrl.Channel),
-				prompts: []openai.ChatCompletionMessage{},
-			}
-			err := json.Unmarshal(*message.Params, &channel)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"error": err.Error(),
-				}).Error("JSON unmarshal error")
-			}
+			event := new(xctrl.DetectedData)
+			json.Unmarshal(*message.Params, event)
 			log.WithFields(log.Fields{
-				"state": channel.State,
-				"uuid":  channel.Uuid,
-			}).Info("Event.Channel:")
-			switch channel.State {
-			case "START":
-				go h.handle(channel)
-			case "DESTROY":
-				log.WithFields(log.Fields{
-					"uuid":     channel.Uuid,
-					"duration": channel.Duration,
-					"billsec":  channel.Billsec,
-					"cause":    channel.Cause,
-				}).Info("Channel Hangup")
-			}
+				"type":     event.Type,
+				"is_final": event.IsFinal,
+				"text":     event.Text,
+			}).Info("DetectedData:")
 		}
+	default:
+		log.WithFields(log.Fields{
+			"method": message.Method,
+		}).Info("Event:")
 	}
-
-}
-
-func (h *TTSHandler) Result(context.Context, string, *ctrl.Result) {
 }
 
 // quick and easy segment implementaion, split by seperators/puctations
-// returns
+// returns:
 // bool, found one of the sep
 // []string, the splited array
 func segment(s string, seps string) (bool, []string) {
@@ -170,13 +148,13 @@ func segment(s string, seps string) (bool, []string) {
 	return false, []string{s}
 }
 
-func (h *TTSHandler) handle(channel *CChannel) {
+func (h *GPTHandler) handle(channel *CChannel) {
 	log.WithFields(log.Fields{
 		"uuid": channel.Uuid,
 		"from": channel.CidNumber,
 		"to":   channel.DestNumber,
 	}).Info("Handle Call")
-	res := channel.Answer()
+	res := channel.Answer0()
 	if res.Code != 200 {
 		return
 	}
@@ -192,7 +170,9 @@ func (h *TTSHandler) handle(channel *CChannel) {
 	channel.prompts = append(channel.prompts, prompt)
 	time.Sleep(500 * time.Millisecond) // waiting for media
 	log.Info(prompt.Content)
+
 	TTS(channel, prompt.Content, 5*time.Second)
+
 	for {
 		beep := "[BEEP]"
 		// beep = ""
@@ -209,14 +189,14 @@ func (h *TTSHandler) handle(channel *CChannel) {
 		} else if heard == "再见" || heard == "拜拜" {
 			TTS(channel, "再见", 5*time.Second)
 			time.Sleep(500 * time.Millisecond)
-			channel.Hangup("NORMAL_CLEARING", xctrl.HangupRequest_SELF)
+			channel.Hangup0("NORMAL_CLEARING", xctrl.HangupRequest_SELF)
 			return
 		}
 		h.request_and_play(channel, heard)
 	}
 }
 
-func (h *TTSHandler) request_and_play(channel *CChannel, heard string) {
+func (h *GPTHandler) request_and_play(channel *CChannel, heard string) {
 	config := openai.DefaultConfig("dummy")
 	config.BaseURL = "http://localhost:8081/api/hello/cn"
 	c := openai.NewClientWithConfig(config)
@@ -298,22 +278,12 @@ func (h *TTSHandler) request_and_play(channel *CChannel, heard string) {
 	}
 
 	if xresponse != nil && xresponse.Code == 200 { // the call still alive
-		channel.Hangup("NORMAL_CLEARING", xctrl.HangupRequest_SELF)
+		channel.Hangup0("NORMAL_CLEARING", xctrl.HangupRequest_SELF)
 	}
 }
 
 func TTS(channel *CChannel, text string, timeout time.Duration) *xctrl.Response {
-	media := &xctrl.Media{
-		Type:   "TEXT",
-		Data:   text,
-		Engine: TTS_ENGINE,
-		Voice:  TTS_VOICE,
-	}
-	req := &xctrl.PlayRequest{
-		Uuid:  channel.Uuid,
-		Media: media,
-	}
-	return channel.PlayWithTimeout(req, timeout)
+	return channel.PlayTTS(TTS_ENGINE, TTS_VOICE, text, ctrl.WithTimeout(timeout))
 }
 
 func Detect(channel *CChannel, text string, timeout time.Duration) *xctrl.DetectResponse {
@@ -337,7 +307,7 @@ func Detect(channel *CChannel, text string, timeout time.Duration) *xctrl.Detect
 		Uuid:     channel.Uuid,
 		Media:    media,
 		Speech: &xctrl.SpeechRequest{
-			Engine:         "ali",
+			Engine:         ASR_ENGINE,
 			NoInputTimeout: 5 * 1000,
 			SpeechTimeout:  15 * 1000,
 			PartialEvents:  true,
@@ -346,5 +316,5 @@ func Detect(channel *CChannel, text string, timeout time.Duration) *xctrl.Detect
 			DigitTimeout: 3 * 1000,
 		},
 	}
-	return channel.DetectSpeech(req, false)
+	return channel.DetectSpeech(req)
 }
