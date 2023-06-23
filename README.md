@@ -28,7 +28,7 @@ go run chatgpt.go
 
 ## Pull Requests
 
-Pull Requests is welcome but the main purpose of this demo is to keep it simple and easy to understand, and strictly limited in "350 lines of code".
+Pull Requests is welcome but the main purpose of this demo is to keep it simple and easy to understand, and strictly limited in "310 lines of code".
 
 ## Videos
 
