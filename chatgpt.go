@@ -43,7 +43,7 @@ func init() {
 	if natsURL == "" {
 		natsURL = "nats://127.0.0.1:4222"
 	}
-	natsSubject = os.Getenv("XCTRL_natsSubject")
+	natsSubject = os.Getenv("XCTRL_SUBJECT")
 	if natsSubject == "" {
 		natsSubject = "cn.xswitch.ctrl"
 	}
@@ -63,20 +63,14 @@ func main() {
 	if err != nil {
 		log.Panic("ctrl init err:", err)
 	}
-
-	myNatsSubject := "cn.xswitch.ctrl"
-
 	w := log.WithFields(log.Fields{}).Writer()
 	defer w.Close()
-
 	log.WithFields(log.Fields{
 		"natsSubject": natsSubject,
 	}).Info("subscribe to:")
 	color.New(color.FgGreen).Fprintln(w, "小樱桃XSwitch ChatGPT Demo Started")
-	ctrl.EnableApp(new(GPTHandler), myNatsSubject, "q")
-
+	ctrl.EnableApp(new(GPTHandler), natsSubject, "q")
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGILL, syscall.SIGTSTP)
-
 	<-shutdown
 	log.Info("shutting down")
 	os.Exit(0)
@@ -84,6 +78,7 @@ func main() {
 
 type GPTHandler struct {
 }
+
 type CChannel struct {
 	*ctrl.Channel
 	prompts []openai.ChatCompletionMessage
@@ -132,8 +127,8 @@ func (h *GPTHandler) Event(message *ctrl.Message, natsEvent nats.Event) {
 
 // quick and easy segment implementaion, split by seperators/puctations
 // returns:
-// bool, found one of the sep
-// []string, the splited array
+//    bool, found one of the sep
+//    []string, the splited array
 func segment(s string, seps string) (bool, []string) {
 	if strings.Contains(s, "\n") {
 		return true, strings.SplitN(s, "\n", 2)
@@ -170,12 +165,9 @@ func (h *GPTHandler) handle(channel *CChannel) {
 	channel.prompts = append(channel.prompts, prompt)
 	time.Sleep(500 * time.Millisecond) // waiting for media
 	log.Info(prompt.Content)
-
 	TTS(channel, prompt.Content, 5*time.Second)
-
 	for {
 		beep := "[BEEP]"
-		// beep = ""
 		response := Detect(channel, beep, 16*time.Second)
 		if response.Code != 200 {
 			return
@@ -198,7 +190,7 @@ func (h *GPTHandler) handle(channel *CChannel) {
 
 func (h *GPTHandler) request_and_play(channel *CChannel, heard string) {
 	config := openai.DefaultConfig("dummy")
-	config.BaseURL = "http://localhost:8081/api/hello/cn"
+	config.BaseURL = "https://demo.xswitch.cn/api/hello/cn"
 	c := openai.NewClientWithConfig(config)
 	if gptToken != "" {
 		c = openai.NewClient(gptToken)
@@ -249,7 +241,6 @@ func (h *GPTHandler) request_and_play(channel *CChannel, heard string) {
 		text = text + response.Choices[0].Delta.Content
 		text = strings.Trim(text, "\n")
 		log.Debugf(">>> %s\n", text)
-
 		seperators := "，。、！？；,.!?;"
 		ok, arr := segment(text, seperators)
 		if ok {
@@ -276,7 +267,6 @@ func (h *GPTHandler) request_and_play(channel *CChannel, heard string) {
 			}
 		}
 	}
-
 	if xresponse != nil && xresponse.Code == 200 { // the call still alive
 		channel.Hangup0("NORMAL_CLEARING", xctrl.HangupRequest_SELF)
 	}

@@ -37,3 +37,7 @@ There's some videos on Wechat: <https://mp.weixin.qq.com/s/cdlkDu3WH6I5X9YWJxG7v
 ## Todo
 
 This Readme is not complete, come back and check updates if you need more details. A Chinese version will also be available soon.
+
+## Screenshots
+
+![](imgs/chatgpt.png)
