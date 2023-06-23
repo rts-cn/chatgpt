@@ -1,6 +1,6 @@
 # ChatGPT Demo
 
-Talk to ChatGPT from your phone in 350 lines of Go code.
+Talk to ChatGPT from your phone in 310 lines of Go code. 用310行Go代码写一个完整的ChatGPT语音聊天程序。
 
 ## Prerequest
 
