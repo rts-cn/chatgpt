@@ -17,9 +17,9 @@ import (
 	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 
+	"git.xswitch.cn/xswitch/proto/go/proto/xctrl"
 	"git.xswitch.cn/xswitch/xctrl/ctrl"
 	"git.xswitch.cn/xswitch/xctrl/ctrl/nats"
-	"git.xswitch.cn/xswitch/xctrl/proto/xctrl"
 	openai "github.com/sashabaranov/go-openai"
 )
 
