@@ -1,6 +1,6 @@
 # ChatGPT Demo
 
-Talk to ChatGPT from your phone in 310 lines of Go code. 用310行Go代码写一个完整的ChatGPT语音聊天程序。
+Talk to ChatGPT from your phone in 320 lines of Go code. 用 320 行 Go 代码写一个完整的 ChatGPT 语音聊天程序。
 
 ## Prerequest
 
@@ -15,6 +15,16 @@ Alternatively, You can use opensource [FreeSWITCH](https://giithub.com/signalwir
 
 ## Build and Run
 
+setup env
+
+```sh
+export GPT_TOKEN= # OpenAI API Token
+export GPT_URL=   # Optional, or any other compatible API
+export GPT_MODEL= # Optional, default is "gpt-3.5-turbo"
+```
+
+run
+
 ```sh
 make
 make run
@@ -28,7 +38,7 @@ go run chatgpt.go
 
 ## Pull Requests
 
-Pull Requests is welcome but the main purpose of this demo is to keep it simple and easy to understand, and strictly limited in "310 lines of code".
+Pull Requests is welcome but the main purpose of this demo is to keep it simple and easy to understand, and strictly limited in "320 lines of code".
 
 ## Videos
 

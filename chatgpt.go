@@ -28,7 +28,9 @@ const TTS_ENGINE = "ali"
 const TTS_VOICE = "aixia"
 const traceNATS = false
 
+var gptURL = ""
 var gptToken = ""
+var gptModel = ""
 var natsURL = ""
 var natsSubject = ""
 
@@ -37,16 +39,20 @@ func pretty(frame *runtime.Frame) (function string, file string) {
 	return "", fmt.Sprintf("%s:%d", fileName, frame.Line)
 }
 
+func getEnv(key, def string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		return def
+	}
+	return val
+}
+
 func init() {
+	gptURL = os.Getenv("GPT_URL")
 	gptToken = os.Getenv("GPT_TOKEN")
-	natsURL = os.Getenv("NATS_URL")
-	if natsURL == "" {
-		natsURL = "nats://127.0.0.1:4222"
-	}
-	natsSubject = os.Getenv("XCTRL_SUBJECT")
-	if natsSubject == "" {
-		natsSubject = "cn.xswitch.ctrl"
-	}
+	gptModel = getEnv("GPT_MODEL", "gpt3.5-turbo")
+	natsURL = getEnv("NATS_URL", "nats://127.0.0.1:4222")
+	natsSubject = getEnv("XCTRL_SUBJECT", "cn.xswitch.ctrl")
 	log.SetReportCaller(true)
 	log.SetLevel(log.DebugLevel)
 	log.SetFormatter(&log.TextFormatter{
@@ -55,6 +61,10 @@ func init() {
 		TimestampFormat:  "2006-01-02 15:04:05.000",
 		CallerPrettyfier: pretty,
 	})
+	log.WithFields(log.Fields{
+		"URL":   gptURL,
+		"Model": gptModel,
+	}).Info("GPT Info")
 }
 
 func main() {
@@ -127,8 +137,9 @@ func (h *GPTHandler) Event(message *ctrl.Message, natsEvent nats.Event) {
 
 // quick and easy segment implementaion, split by seperators/puctations
 // returns:
-//    bool, found one of the sep
-//    []string, the splited array
+//
+//	bool, found one of the sep
+//	[]string, the splited array
 func segment(s string, seps string) (bool, []string) {
 	if strings.Contains(s, "\n") {
 		return true, strings.SplitN(s, "\n", 2)
@@ -189,19 +200,16 @@ func (h *GPTHandler) handle(channel *CChannel) {
 }
 
 func (h *GPTHandler) request_and_play(channel *CChannel, heard string) {
-	config := openai.DefaultConfig("dummy")
-	config.BaseURL = "https://demo.xswitch.cn/api/hello/cn"
+	config := openai.DefaultConfig(gptToken)
+	config.BaseURL = gptURL
 	c := openai.NewClientWithConfig(config)
-	if gptToken != "" {
-		c = openai.NewClient(gptToken)
-	}
 	channel.prompts = append(channel.prompts, openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleUser,
 		Content: heard,
 	})
 	req := openai.ChatCompletionRequest{
-		Model:     openai.GPT3Dot5Turbo,
-		MaxTokens: 100,
+		Model:     gptModel,
+		MaxTokens: 120,
 		Messages:  channel.prompts,
 		Stream:    true,
 	}
@@ -272,10 +280,12 @@ func (h *GPTHandler) request_and_play(channel *CChannel, heard string) {
 	}
 }
 
+// play TTS
 func TTS(channel *CChannel, text string, timeout time.Duration) *xctrl.Response {
 	return channel.PlayTTS(TTS_ENGINE, TTS_VOICE, text, ctrl.WithTimeout(timeout))
 }
 
+// play text and detect speech
 func Detect(channel *CChannel, text string, timeout time.Duration) *xctrl.DetectResponse {
 	file := "silence_stream://1000"
 	if text == "[BEEP]" {
